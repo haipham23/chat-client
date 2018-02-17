@@ -1,0 +1,19 @@
+.Chat-container {
+  position: relative;
+  width: 50vw;
+  background-color: #FFFFFF;
+  border: 1px solid #EEEEEE;
+  height: 30vh;
+  overflow: scroll;
+  margin: 30px auto;
+}
+.Chat-container ul {
+  margin: 0;
+  padding: 0;
+
+}
+.Chat-container ul>li {
+  list-style: none;
+  padding: 5px;
+  text-align: left;
+}
