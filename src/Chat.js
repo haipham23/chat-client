@@ -8,7 +8,7 @@ import * as ReactDOM from 'react-dom';
 import './Chat.css';
 
 const socket = socketCluster.connect({
-  hostname: '127.0.0.1',
+  hostname: '45.77.253.119',
   port: 8000
 });
 
