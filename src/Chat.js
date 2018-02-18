@@ -1,10 +1,12 @@
 import React, { Component } from 'react';
 import socketCluster from 'socketcluster-client';
 import { List } from 'immutable';
-import * as ReactDOM from 'react-dom';
 import axios from 'axios';
 
 import config from './configs/dev';
+
+import ChatAuth from './ChatAuth';
+import ChatContact from './ChatContact';
 
 
 import './Chat.css';
@@ -14,12 +16,6 @@ const socket = socketCluster.connect({
   port: config.SOCKET_PORT
 });
 
-socket.on('connect', function () {
-  console.log('CONNECTED');
-});
-
-
-
 class Chat extends Component {
   constructor(props) {
     super(props);
@@ -28,20 +24,26 @@ class Chat extends Component {
       chatContent: '',
       username: '',
       password: '',
-      target: '',
+      rUsername: '',
+      rPassword: '',
+      newContact: '',
+      contact: '',
       token: '',
       isAuthError: false,
       isRegError: false,
+      isAddContactError: false,
       isChat: false,
-      messages: List()
+      messages: List(),
+      contacts: List()
     };
 
     this.onChange = this.onChange.bind(this);
     this.send = this.send.bind(this);
-    this.scrollToBottom = this.scrollToBottom.bind(this);
     this.onConnect = this.onConnect.bind(this);
     this.onDisconnect = this.onDisconnect.bind(this);
+    this.onLogin = this.onLogin.bind(this);
     this.onRegister = this.onRegister.bind(this);
+    this.onAddContact = this.onAddContact.bind(this);
   }
 
   onChange(e) {
@@ -51,11 +53,11 @@ class Chat extends Component {
   }
 
   send() {
-    const { username, target, chatContent, token } = this.state;
+    const { username, contact, chatContent, token } = this.state;
 
     axios.post(config.QUEUE_URL, {
       from: username,
-      to: target,
+      to: contact,
       text: chatContent
     }, {
       headers: {
@@ -74,55 +76,36 @@ class Chat extends Component {
       });
   }
 
-  onConnect() {
-    const { username, password, target } = this.state;
+  onConnect(target) {
+    const { username } = this.state;
 
-    axios.post(config.AUTH_URL, { username, password })
-      .then((response) => {
-        if (response.data !== 'SERVER_ERROR') {
-          this.setState({
-            token: response.data,
-            isAuthError: false,
-            isChat: true
-          });
+    this.setState({
+      contact: target,
+      messages: List()
+    });
 
-          const chatChannel1 = socket.subscribe(`new_message_${username}_${target}`);
-          const chatChannel2 = socket.subscribe(`new_message_${target}_${username}`);
+    const chatChannel1 = socket.subscribe(`new_message_${username}_${target}`);
+    const chatChannel2 = socket.subscribe(`new_message_${target}_${username}`);
 
-          chatChannel1.watch((chat) => {
-            this.setState({
-              messages: this.state.messages.push({
-                username,
-                msg: chat.msg,
-                align: 'right'
-              })
-            }, () => this.scrollToBottom());
-          });
-
-          chatChannel2.watch((chat) => {
-            this.setState({
-              messages: this.state.messages.push({
-                username: target,
-                msg: chat.msg,
-                align: 'left'
-              })
-            }, () => this.scrollToBottom());
-          });
-        } else {
-          this.setState({
-            token: '',
-            isAuthError: true,
-            isChat: false
-          });
-        }
-      })
-      .catch(() => {
-        this.setState({
-          token: '',
-          isAuthError: true,
-          isChat: false
-        });
+    chatChannel1.watch((chat) => {
+      this.setState({
+        messages: this.state.messages.push({
+          username,
+          msg: chat.msg,
+          align: 'right'
+        })
       });
+    });
+
+    chatChannel2.watch((chat) => {
+      this.setState({
+        messages: this.state.messages.push({
+          username: target,
+          msg: chat.msg,
+          align: 'left'
+        })
+      });
+    });
   }
 
   onDisconnect() {
@@ -134,121 +117,121 @@ class Chat extends Component {
     });
   }
 
+  onLogin() {
+    const { username, password } = this.state;
+
+    axios.post(config.AUTH_URL, { username, password })
+      .then((response) => {
+        if (response.data === 'SERVER_ERROR') {
+          return Promise.reject(new Error('LOGIN_FAILED'));
+        }
+
+        this.setState({
+          token: response.data
+        });
+
+        return axios.get(config.CONTACT_URL, {
+          headers: {
+            'x-auth-token': `${username} ${response.data}`
+          }
+        });
+      })
+      .then((response) => {
+        this.setState({
+          contacts: List(response.data),
+          isAuthError: false,
+          isChat: true
+        });
+      })
+      .catch((e) => {
+        this.setState({
+          token: '',
+          isAuthError: true,
+          isChat: false
+        });
+      });
+  }
+
   onRegister() {
-    const { rusername, rpassword } = this.state;
+    const { rUsername, rPassword } = this.state;
 
     axios
-      .post(config.REGISTER_URL, { username: rusername, password: rpassword })
+      .post(config.REGISTER_URL, { username: rUsername, password: rPassword })
       .then(() => {
         this.setState({
           isRegError: false,
-          rusername: '',
-          rpassword: ''
+          rUsername: '',
+          rPassword: ''
         });
       })
       .catch(() => {
         this.setState({
           isRegError: true,
-          rusername: '',
-          rpassword: ''
+          rUsername: '',
+          rPassword: ''
         });
       })
   }
 
-  scrollToBottom() {
-    const { messageList } = this.refs;
-    const scrollHeight = messageList.scrollHeight;
-    const height = messageList.clientHeight;
-    const maxScrollTop = scrollHeight - height;
-    ReactDOM.findDOMNode(messageList).scrollTop = maxScrollTop > 0 ? maxScrollTop : 0;
+  onAddContact() {
+    const { username, token, newContact } = this.state;
+
+    axios
+      .post(
+        config.CONTACT_URL,
+        { contact: newContact },
+        {
+          headers: {
+            'x-auth-token': `${username} ${token}`
+          }
+        }
+      )
+      .then(() => {
+        this.setState({
+          isAddContactError: false,
+          newContact: '',
+          contacts: this.state.contacts.push({
+            contact: newContact
+          })
+        });
+      })
+      .catch((error) => {
+        this.setState({
+          isAddContactError: true,
+          newContact: ''
+        });
+      });
   }
 
   render() {
     return (
-      <div className="Chat">
-        {
-          !this.state.isChat &&
-          <div className="Chat-auth">
-            <div>
-              <h2>
-                Login
-              </h2>
-              <input
-                name="username"
-                placeholder="username"
-                onChange={this.onChange}
-                value={this.state.username}
-              />
-              <input
-                name="password"
-                type="password"
-                placeholder="password"
-                onChange={this.onChange}
-                value={this.state.password}
-              />
-              <input
-                name="target"
-                placeholder="target username"
-                onChange={this.onChange}
-                value={this.state.target}
-              />
-              <button
-                onClick={this.onConnect}
-              >Connect</button>
-              <p style={{ color: 'red' }}>{ this.state.isAuthError && 'Auth error' }</p>
-            </div>
-            <div>
-              <h2>
-                Register
-              </h2>
-              <input
-                name="rusername"
-                placeholder="username"
-                onChange={this.onChange}
-                value={this.state.rusername}
-              />
-              <input
-                name="rpassword"
-                type="password"
-                placeholder="password"
-                onChange={this.onChange}
-                value={this.state.rpassword}
-              />
-              <button
-                onClick={this.onRegister}
-              >Register</button>
-              <p style={{ color: 'red' }}>{ this.state.isRegError && 'Reg error' }</p>
-            </div>
-          </div>
-        }
-        {
-          this.state.isChat &&
-          <div>
-            <div ref="messageList" className="Chat-container">
-              <ul>
-                {
-                  this.state.messages.map((m, idx) => (
-                    <li key={`msg__${idx}`} style={{ textAlign: m.align }}>{m.username}: {m.msg}</li>
-                  ))
-                }
-              </ul>
-            </div>
-            <div>
-              <input
-                name="chatContent"
-                placeholder="message"
-                onChange={this.onChange}
-                value={this.state.chatContent}
-              />
-              <button
-                onClick={this.send}
-              >Send</button>
-              <button
-                onClick={this.onDisconnect}
-              >Disconnect</button>
-            </div>
-          </div>
-        }
+      <div className="container Chat">
+        <ChatAuth
+          isDisplay={!this.state.isChat}
+          username={this.state.username}
+          password={this.state.password}
+          rUsername={this.state.rUsername}
+          rPassword={this.state.rPassword}
+          isAuthError={this.state.isAuthError}
+          isRegError={this.state.isRegError}
+          onLogin={this.onLogin}
+          onRegister={this.onRegister}
+          onChange={this.onChange}
+        />
+        <ChatContact
+          isDisplay={this.state.isChat}
+          contacts={this.state.contacts.toArray()}
+          messages={this.state.messages.toArray()}
+          contact={this.state.contact}
+          newContact={this.state.newContact}
+          chatContent={this.state.chatContent}
+          isAddContactError={this.state.isAddContactError}
+          onAddContact={this.onAddContact}
+          onChange={this.onChange}
+          onConnect={this.onConnect}
+          onDisconnect={this.onDisconnect}
+          send={this.send}
+        />
       </div>
     );
   }

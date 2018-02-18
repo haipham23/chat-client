@@ -1,12 +1,12 @@
 .Chat-container {
   position: relative;
-  width: 50vw;
   background-color: #FFFFFF;
   border: 1px solid #EEEEEE;
-  height: 30vh;
+  height: 50vh;
   overflow: scroll;
-  margin: 30px auto;
-  padding: 5px;
+  margin: 40px auto 20px auto;
+  border-radius: .25rem;
+  padding: 10px;
 }
 .Chat-container ul {
   margin: 0;
@@ -19,8 +19,24 @@
   text-align: left;
 }
 
-input,
-button {
-  padding: 5px 10px;
-  margin: 5px;
+.Chat-auth {
+  margin-top: 40px;
+}
+
+.Chat-login {
+  background-color: #C8CFD6;
+  padding: 40px;
+  border-radius: 4px;
+}
+
+.Chat-register {
+  padding: 40px;
+}
+
+.Chat-contact {
+  margin-top: 40px;
+}
+
+.Chat-contact > .list-group {
+  margin-bottom: 15px;
 }
