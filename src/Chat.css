@@ -6,6 +6,7 @@
   height: 30vh;
   overflow: scroll;
   margin: 30px auto;
+  padding: 5px;
 }
 .Chat-container ul {
   margin: 0;
@@ -16,4 +17,10 @@
   list-style: none;
   padding: 5px;
   text-align: left;
+}
+
+input,
+button {
+  padding: 5px 10px;
+  margin: 5px;
 }
